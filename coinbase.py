@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from enum import Enum, auto
 import csv
 import time
+import math
 import pandas as pd
 
 _base_url = "https://api.pro.coinbase.com/%s"
@@ -15,7 +16,11 @@ class Coin(Enum):
         Ethereum = "ETH"
 
 class Granularity(Enum):
-    Hour = {'time_unit': 'hours' , 'seconds_per_unit_time': 3600}
+    Hour = {'time_unit': 'hours' , 'seconds_per_unit_time': 3600, 'unit_time_per_day': 24}
+
+def get_csv_path_for(coin, prefix):
+    fileName = "%s_%s.csv" % (prefix, coin.value)
+    return _csv_path % fileName 
 
 def get_time_frame(granularity, count: int, start=datetime.now()) -> (datetime, datetime):
     max_count_for_frame = 300
@@ -26,13 +31,18 @@ def get_time_frame(granularity, count: int, start=datetime.now()) -> (datetime, 
     start = start - timedelta(**delta)
     return (start, end)
 
+def get_historical_df_by_end_datetime(coin, end_datetime: datetime, granularity: Granularity, start_datetime=datetime.now()):
+    delta = (start_datetime - end_datetime)
+    hours = delta.days * granularity.value['unit_time_per_day'] + math.ceil(delta.seconds/granularity.value['seconds_per_unit_time'])
+    get_historical_df_by_count(coin, count=hours, granularity=granularity)
+
+
 def get_historical_df_by_count(coin, count=5, currency_code="USD", granularity=Granularity.Hour, **kwrgs):
-    csv_name = "historical_data_%s.csv" % coin.value
+    csv =  get_csv_path_for(coin, "historical_data")
     headers = ['time', 'low', 'high', 'open', 'close', 'volume']
     historical_data = "products/%s/candles" % (coin.value + "-" + currency_code)
     
     def process_results(results: pd.DataFrame, first: bool):
-        csv = _csv_path % csv_name
         results['time'] = results['time'].apply(lambda x: datetime.fromtimestamp(x).isoformat())
         results = results.drop(columns='volume')
         if first:
@@ -78,7 +88,7 @@ def get_historical_df_by_count(coin, count=5, currency_code="USD", granularity=G
                 first = False
 
         else: 
-            return "Error for %i'th call, start: %s end: %s" % (total_requests, start.isoformat(), end.isoformat())
+            print("Error for %i'th call, start: %s end: %s" % (total_requests, start.isoformat(), end.isoformat()))
 
     time.sleep(1)
-    return "Made %i calls processed. final start: %s final end: %s" % (total_requests, start.isoformat(), end.isoformat())
+    print ("Made %i calls processed. final start: %s final end: %s" % (total_requests, start.isoformat(), end.isoformat()))
