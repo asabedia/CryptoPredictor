@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 from newsapi import NewsApiClient
 import pandas as pd
 import math
@@ -25,6 +24,3 @@ for i in range (2,total_pages+1):
     continue
 
 
-=======
-from newsapi import newsApiClient
->>>>>>> creating a wrapper for coinbase api
