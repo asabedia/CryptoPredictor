@@ -1,7 +1,7 @@
 import coinbase as cb
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 
 if __name__ == "__main__":
-    cb.get_historical_df_by_end_datetime(cb.Coin.Ethereum, datetime(2019, 1, 1), cb.Granularity.Hour)
-    cb.get_historical_df_by_end_datetime(cb.Coin.Litecoin, datetime(2019, 1, 1), cb.Granularity.Hour)
+    end = datetime.utcnow() - timedelta(hours=1)
+    cb.get_trades_by_range(cb.Coin.Bitcoin, cb.Granularity.Hour, end_datetime=end, skip_pages=1000)

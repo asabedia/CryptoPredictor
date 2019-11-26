@@ -1,9 +1,10 @@
 import requests as req
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum, auto
 import csv
 import time
 import math
+import iso8601
 import pandas as pd
 
 _base_url = "https://api.pro.coinbase.com/%s"
@@ -35,7 +36,6 @@ def get_historical_df_by_end_datetime(coin, end_datetime: datetime, granularity:
     delta = (start_datetime - end_datetime)
     hours = delta.days * granularity.value['unit_time_per_day'] + math.ceil(delta.seconds/granularity.value['seconds_per_unit_time'])
     get_historical_df_by_count(coin, count=hours, granularity=granularity)
-
 
 def get_historical_df_by_count(coin, count=5, currency_code="USD", granularity=Granularity.Hour, **kwrgs):
     csv =  get_csv_path_for(coin, "historical_data")
@@ -92,3 +92,61 @@ def get_historical_df_by_count(coin, count=5, currency_code="USD", granularity=G
 
     time.sleep(1)
     print ("Made %i calls processed. final start: %s final end: %s" % (total_requests, start.isoformat(), end.isoformat()))
+
+def get_trades_by_range(coin: Coin, granularity: Granularity, end_datetime: datetime, skip_pages=10, currency_code="USD" ,start_datetime=datetime.now(timezone.utc)):
+    csv = get_csv_path_for(coin, "trades_data")
+    headers = ['time', 'trade_id', 'price', 'size', 'side']
+    trades_data = "products/%s/trades" % (coin.value + "-" + currency_code)
+    end_datetime = end_datetime.replace(tzinfo=timezone.utc)
+
+    def reduce(date_time: datetime) -> datetime:
+        if granularity==Granularity.Hour:
+            return date_time.replace(minute=0, second=0, microsecond=0)
+        else:
+            return date_time
+
+    def process_results(results: pd.DataFrame, first: bool):
+        results['time'] = results['time'].apply(lambda x: reduce(iso8601.parse_date(x)).isoformat())
+        if first:
+            results.to_csv(csv, index=False)
+        else: 
+            results.to_csv(csv, mode='a', header=False, index=False)
+
+    url = _base_url % trades_data
+
+    last_datetime = start_datetime
+    total_requests = 0
+    first = True
+
+    params = {}
+    after = None
+    print(end_datetime)
+    while(last_datetime > end_datetime):
+        if not first and after:
+            print(str(int(after) - skip_pages))
+            params['after'] = str(int(after) - skip_pages)
+
+        # wait for rate limit to relax
+        if (total_requests % _rate_limit == 0 and total_requests > 0):
+            time.sleep(3)
+
+        resp = req.get(url, params=params)
+        total_requests = total_requests + 1
+        if resp.status_code == 200:
+            after = resp.headers['cb-after']
+            resp_conent=resp.json()
+
+            if (not resp_conent):
+                break
+
+            df = pd.DataFrame(resp_conent)
+            df.columns = headers
+            last_datetime = iso8601.parse_date(df['time'].iloc[-1])
+            print(last_datetime)
+            process_results(df, first)
+            
+            if first:
+                first = False
+
+        else: 
+            print("Error for %i'th call, after: %s" % (total_requests, after))
