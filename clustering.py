@@ -6,8 +6,10 @@ df = pd.read_csv('csv/processed/processed_cleaned_BTC.csv')
 df_stripped= df[449:1165]
 df_train = df_stripped.reset_index().drop(columns=['time','index'])
 cluster = AffinityPropagation().fit(df_train)
-df_clusters = pd.DataFrame(columns = df_train.columns)
+df_clusters = pd.DataFrame(columns = [df_train.columns,'time'])
 for i in cluster.cluster_centers_indices_:
-    df_clusters = df_clusters.append(df_train[i])
+    df_clusters = df_clusters.append(df_train.iloc[i])
+    df_clusters['time'] = append(df_stripped['time'].iloc[i])
+
 
 print(df_clusters)
