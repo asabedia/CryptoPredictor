@@ -24,4 +24,3 @@ def merge_news_with_df(csv_path='csv/processed/processed_cleaned_BTC.csv'):
     news_and_BTC = merger(df_BTC,df_news_BTC)
     news_and_BTC.to_csv('csv/processed/BTC_with_news.csv', index=False)
 
-
