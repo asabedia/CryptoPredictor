@@ -44,17 +44,21 @@ df['output'] = df['close'].shift(1)
 df = df.drop(0)
 df = df.dropna()
 
-df = df.drop(columns=['time','Day'])
+df = df.drop(columns=['time', 'Day'])
 test, train = split_dataset(df, 20)
-
+print(test)
 X_train = train.drop(columns=['output'])
 X_test = test.drop(columns=['output'])
+print(X_train)
 Y_train = train['output']
 Y_test = test['output']
-
+print(X_train)
 xgbm = xgboosting(X_train, Y_train)
 lr = linear_regression(X_train, Y_train)
-
+pdf = pd.DataFrame(columns=['pred', 'true'])
+pdf['pred'] = xgbm.predict(X_test)
+pdf['true'] = Y_test.to_numpy()
 print("XGB RMSE: ", np.sqrt(mean_squared_error(Y_test, xgbm.predict(X_test))))
 print("LinReg RMSE: ", np.sqrt(mean_squared_error(Y_test, lr.predict(X_test))))
+print(pdf)
 # xgb.plot_importance(xgbm, height=0.9)
