@@ -17,9 +17,9 @@ _rate_limit = 3 # requests per second
 s.mount("%s" % _base_url, HTTPAdapter(max_retries=8))
 
 class Coin(Enum):
-        Bitcoin = "BTC"
-        Litecoin = "LTC"
-        Ethereum = "ETH"
+    Bitcoin = "BTC"
+    Litecoin = "LTC"
+    Ethereum = "ETH"
 
 class Granularity(Enum):
     Hour = {'time_unit': 'hours' , 'seconds_per_unit_time': 3600, 'unit_time_per_day': 24}
