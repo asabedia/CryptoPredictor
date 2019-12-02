@@ -11,17 +11,9 @@ from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import KFold
 from sklearn.metrics import r2_score, mean_squared_error, explained_variance_score
 import seaborn as sns
-from sklearn import preprocessing
 import math
 
-def xgb_kfold(X, Y, splits):
-    data_dmatrix = xgb.DMatrix(data=X,label=Y)
-    params = {"objective":"reg:squarederror",'colsample_bytree': 0.3,'learning_rate': 0.1,
-                'max_depth': 5, 'alpha': 10}
 
-    cv_results = xgb.cv(dtrain=data_dmatrix, params=params, nfold=splits,
-                    num_boost_round=50,early_stopping_rounds=10,metrics="rmse", as_pandas=True, seed=123)
-    return (cv_results["test-rmse-mean"]).tail(1)
 
 def linear_regression(X, Y):
     lr = LinearRegression(normalize=True)
@@ -47,11 +39,23 @@ def split_dataset(data, test_percent: int):
     test_size = math.ceil(size * (test_percent/100))
     return data[:test_size].copy(), data[test_size:].copy()
 
-df = pd.read_csv('csv/processed/BTC_with_news.csv')
+type_hourly ='csv/processed/BTC_with_news.csv'
+type_daily = 'csv/processed/BTC_with_news_daily.csv'
+df = pd.read_csv(type_daily)
+
+## GRAPH ENTIRE DATASET ##
+df_rev = df.iloc[::-1]
+figure = plt.figure(figsize = (6,6))
+plt.plot(df_rev['Day'], df_rev['price_mean'])
+plt.title('BTC Price Over Time ')
+figure.savefig('graphs/BTC_Price_Over_Time.png',bbox_inches = "tight")
+plt.close()
+## POST PROCESSING ##
 df['output'] = df['high'].shift(1)
 df = df.drop(0)
 df = df.dropna()
-df = df.drop(columns=['time', 'Day','close','z_score'])
+df = df.drop(columns=['time', 'Day','open','z_score'])
+
 
 ## CORRELATION TESTS ##
 df_corr = df.drop(columns=['output'])
