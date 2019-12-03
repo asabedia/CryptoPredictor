@@ -16,11 +16,12 @@ def merger(df_left,df_right):
     df_merged['Polarity_of_Desc'].replace(np.nan,"0", inplace = True)
     return df_merged
 
-def merge_news_with_df(csv_path='csv/processed/processed_cleaned_BTC.csv'):
+def merge_news_with_df(csv_path='csv/processed/processed_cleaned_daily_BTC.csv'):
     df = pd.read_csv(csv_path)
     df_BTC = create_date(df)
     df_news = pd.read_csv('csv/news_gb_days.csv')
     df_news_BTC = split_news(df_news,'Bitcoin')
     news_and_BTC = merger(df_BTC,df_news_BTC)
-    news_and_BTC.to_csv('csv/processed/BTC_with_news.csv', index=False)
+    news_and_BTC.to_csv('csv/processed/BTC_with_news_daily.csv', index=False)
 
+merge_news_with_df()
