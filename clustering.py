@@ -81,6 +81,3 @@ plt.ylabel('risk per dollar')
 plt.title('Mean vs Risk Per Dollar')
 plt.show()
 plt.close()
-
-
-
