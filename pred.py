@@ -13,8 +13,6 @@ from sklearn.metrics import r2_score, mean_squared_error, explained_variance_sco
 import seaborn as sns
 import math
 
-
-
 def linear_regression(X, Y):
     lr = LinearRegression(normalize=True)
     lr.fit(X, Y)
@@ -39,87 +37,88 @@ def split_dataset(data, test_percent: int):
     test_size = math.ceil(size * (test_percent/100))
     return data[:test_size].copy(), data[test_size:].copy()
 
+def models_and_test_set(df):
+    df = df.drop(0)
+    df = df.dropna()
+    df = df.drop(columns=['time', 'Day','open','z_score','low','high','price_mean'])
+    test, train = split_dataset(df, 20)
+    X_train, Y_train = train.drop(columns=['output']), train['output']
+    return linear_regression(X_train, Y_train), xgboosting(X_train, Y_train), test
+
+def rmse(y_pred, y_true):
+    return math.sqrt(mean_squared_error(y_true, y_pred))
+
+def percent_over_under_true(df_true_vs_pred: pd.DataFrame, pred_over=True):
+    if pred_over:
+        return len(df_true_vs_pred[df_true_vs_pred['true'] < df_true_vs_pred['pred']])/len(df_true_vs_pred)
+    else:
+        return len(df_true_vs_pred[df_true_vs_pred['true'] > df_true_vs_pred['pred']])/len(df_true_vs_pred)
+
 type_hourly ='csv/processed/BTC_with_news.csv'
 type_daily = 'csv/processed/BTC_with_news_daily.csv'
-df = pd.read_csv(type_hourly)
-df2 = df.copy()
 
-## GRAPH ENTIRE DATASET ##
-df_rev = df.iloc[::-1]
-figure = plt.figure(figsize = (6,6))
-plt.plot(df_rev['Day'], df_rev['price_mean'])
-plt.title('BTC Price Over Time ')
-figure.savefig('graphs/BTC_Price_Over_Time.png',bbox_inches = "tight")
-plt.close()
+df_hourly = pd.read_csv(type_hourly)
+df_hourly['output'] = df_hourly['high'].shift(1)
 
-## POST PROCESSING ##
-df['output'] = df['high'].shift(1)
-df = df.drop(0)
-df = df.dropna()
-df = df.drop(columns=['time', 'Day','open','z_score','low','high','price_mean'])
+df_daily = pd.read_csv(type_daily)
+df_daily['output'] = df_daily['high'].shift(1)
 
+lr_hour, xgbst_hour, test_hour = models_and_test_set(df_hourly)
+lr_day, xgbst_day, test_day = models_and_test_set(df_daily)
 
-## CORRELATION TESTS ##
-df_corr = df.drop(columns=['output'])
-correlation_tests(df_corr)
+X_test_hour, Y_test_hour = test_hour.drop(columns=['output']), test_hour['output']
+X_test_day, Y_test_day = test_day.drop(columns=['output']), test_day['output']
 
+lr_pred_daily, lr_pred_hourly = lr_day.predict(X_test_day), lr_hour.predict(X_test_hour)
+xgb_pred_daily, xgb_pred_hourly = xgbst_day.predict(X_test_day), xgbst_hour.predict(X_test_hour)
 
-## MODEL TRAINING ##
-test, train = split_dataset(df, 20)
-X_train = train.drop(columns=['output'])
-X_test = test.drop(columns=['output'])
-Y_train = train['output']
-Y_test = test['output']
-xgbm = xgboosting(X_train, Y_train)
-lr = linear_regression(X_train, Y_train)
+# Daily
+lr_daily_pred_vs_true = pd.DataFrame()
+lr_daily_pred_vs_true['pred'] = lr_pred_daily
+lr_daily_pred_vs_true['true'] = Y_test_day.to_numpy()
 
+xgbst_daily_pred_vs_true = pd.DataFrame()
+xgbst_daily_pred_vs_true['pred'] = xgb_pred_daily
+xgbst_daily_pred_vs_true['true'] = Y_test_day.to_numpy()
 
-## OUTPUT ##
+# Hourly
+lr_hourly_pred_vs_true = pd.DataFrame()
+lr_hourly_pred_vs_true['pred'] = lr_pred_hourly
+lr_hourly_pred_vs_true['true'] = Y_test_hour.to_numpy()
 
-#LinReg
-pdf = pd.DataFrame(columns=['true'])
-pdf['pred_Lin_Reg'] = lr.predict(X_test)
-pdf['true'] = Y_test.to_numpy()
-print("LinReg RMSE: ", np.sqrt(mean_squared_error(Y_test, lr.predict(X_test))))
-print(pdf)
+xgbst_hourly_pred_vs_true = pd.DataFrame()
+xgbst_hourly_pred_vs_true['pred'] = xgb_pred_hourly
+xgbst_hourly_pred_vs_true['true'] = Y_test_hour.to_numpy()
 
-#Xgboost
-pdf2 = pd.DataFrame(columns=['pred', 'true'])
-pdf2['pred'] = xgbm.predict(X_test)
-pdf['pred_XGBoost'] = xgbm.predict(X_test)
-pdf2['true'] = Y_test.to_numpy()
-print("XGB RMSE: ", np.sqrt(mean_squared_error(Y_test, xgbm.predict(X_test))))
-print(pdf2)
+# RMSE
+df_rmse = pd.DataFrame()
+df_rmse['lr_hour'] = [rmse(lr_hourly_pred_vs_true['pred'], lr_hourly_pred_vs_true['true'])]
+df_rmse['lr_daily'] = [rmse(lr_daily_pred_vs_true['pred'], lr_daily_pred_vs_true['true'])]
 
-## FEATURE IMPORTANCE Linear Regression##
-f_imp_lr = df.corr()
-print(f_imp_lr['output'])
+df_rmse['xgb_hour'] = [rmse(xgbst_hourly_pred_vs_true['pred'], xgbst_hourly_pred_vs_true['true'])]
+df_rmse['xgb_daily'] = [rmse(xgbst_daily_pred_vs_true['pred'], xgbst_daily_pred_vs_true['true'])]
 
-## FEATURE IMPORTANCE XGBoost##
-feat_imp = pd.Series(xgbm.feature_importances_,index=X_train.transpose().index).sort_values(ascending=False)
-feature_importance = plt.figure(figsize = (6,6))
-sns.barplot(x=feat_imp, y=feat_imp.index)
-plt.xlabel('Feature Importance Score')
-plt.ylabel('Features')
-plt.title("XGB Feature Importance")
-plt.legend()
-feat_imp.to_frame().rename(columns={0: "Feature Importance"}).to_html('graphs/Feature_Importance.html')
-feature_importance.savefig("graphs/XGB_Feature_Importance.png", bbox_inches = "tight")
-plt.close()
+print("RMSE")
+print(df_rmse)
 
-## Predictions ##
-test, train = split_dataset(df2, 20)
-pdf['time'] = test['time']
-figure = plt.figure(figsize = (12,6))
-pdf = pdf.iloc[::-1]
-plt.plot( 'time', 'pred_Lin_Reg', data=pdf, marker='',  color='red', linewidth=1, label='Linear Regression')
-plt.plot( 'time', 'pred_XGBoost', data=pdf, marker='', color='green', linewidth=1,label="XGBoost")
-plt.plot( 'time', 'true', data=pdf, marker='', color='black', linewidth=2,label="Actual",alpha=0.5)
-plt.xticks(pdf['time'][::336], rotation='vertical')
-plt.title('Hourly Predictions')
-plt.legend()
-figure.savefig("graphs/predictions.png", bbox_inches = "tight")
+# Over
+df_over = pd.DataFrame()
+df_over['lr_over_hour'] = [percent_over_under_true(lr_hourly_pred_vs_true)]
+df_over['lr_over_daily'] = [percent_over_under_true(lr_daily_pred_vs_true)]
 
-plt.close()
+df_over['xgb_over_hour'] = [percent_over_under_true(xgbst_hourly_pred_vs_true)]
+df_over['xgb_over_daily'] = [percent_over_under_true(xgbst_daily_pred_vs_true)]
 
+print("Percent Over")
+print(df_over)
 
+# Under
+df_under = pd.DataFrame()
+df_under['lr_under_hour'] = [percent_over_under_true(lr_hourly_pred_vs_true, False)]
+df_under['lr_under_daily'] = [percent_over_under_true(lr_daily_pred_vs_true, False)]
+
+df_under['xgb_under_hour'] = [percent_over_under_true(xgbst_hourly_pred_vs_true, False)]
+df_under['xgb_under_daily'] = [percent_over_under_true(xgbst_daily_pred_vs_true, False)]
+
+print("Percent Under")
+print(df_under)

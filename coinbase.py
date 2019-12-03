@@ -23,9 +23,10 @@ class Coin(Enum):
 
 class Granularity(Enum):
     Hour = {'time_unit': 'hours' , 'seconds_per_unit_time': 3600, 'unit_time_per_day': 24}
+    Day = {'time_unit': 'days' , 'seconds_per_unit_time': 86400, 'unit_time_per_day': 1}
 
-def get_csv_path_for(coin, prefix):
-    fileName = "%s_%s.csv" % (prefix, coin.value)
+def get_csv_path_for(coin, prefix, granularity: Granularity = Granularity.Hour):
+    fileName = "%s/%s_%s.csv" % (granularity.value['time_unit'], prefix, coin.value)
     return _csv_path % fileName 
 
 def get_time_frame(granularity, count: int, start=datetime.utcnow()) -> (datetime, datetime):
@@ -44,7 +45,7 @@ def get_historical_df_by_end_datetime(coin, end_datetime: datetime, granularity:
     get_historical_df_by_count(coin, count=hours, granularity=granularity)
 
 def get_historical_df_by_count(coin, count=5, currency_code="USD", granularity=Granularity.Hour, **kwrgs):
-    csv =  get_csv_path_for(coin, "historical_data")
+    csv =  get_csv_path_for(coin, "historical_data", granularity=granularity)
     headers = ['time', 'low', 'high', 'open', 'close', 'volume']
     historical_data = "products/%s/candles" % (coin.value + "-" + currency_code)
     
